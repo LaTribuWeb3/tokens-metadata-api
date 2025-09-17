@@ -1,0 +1,161 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Token Metadata API",
+    "version": "1.0.0",
+    "description": "API for fetching token metadata from Ethereum networks"
+  },
+  "servers": [
+    {
+      "url": "https://your-api-domain.com",
+      "description": "Production server"
+    }
+  ],
+  "paths": {
+    "/tokens/{network}/{address}": {
+      "get": {
+        "summary": "Get token metadata",
+        "description": "Retrieve token metadata (name, symbol, decimals) for a given token address on a specific Ethereum network",
+        "operationId": "getTokenMetadata",
+        "tags": ["tokens"],
+        "parameters": [
+          {
+            "name": "network",
+            "in": "path",
+            "required": true,
+            "description": "Ethereum network name",
+            "schema": {
+              "type": "string",
+              "enum": ["mainnet", "arbitrum", "polygon", "optimism", "base", "sepolia", "arbitrum-sepolia", "polygon-mumbai"]
+            }
+          },
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "description": "Token contract address",
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[a-fA-F0-9]{40}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token metadata retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenMetadata"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid network or address format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Token not found or invalid contract",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TokenMetadata": {
+        "type": "object",
+        "required": ["address", "network", "name", "symbol", "decimals"],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Token contract address",
+            "example": "0xaf88d065e77c8cc2239327c5edb3a432268e5831"
+          },
+          "network": {
+            "type": "string",
+            "description": "Ethereum network name",
+            "example": "arbitrum"
+          },
+          "name": {
+            "type": "string",
+            "description": "Token name",
+            "example": "USD Coin"
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Token symbol",
+            "example": "USDC"
+          },
+          "decimals": {
+            "type": "integer",
+            "description": "Number of decimal places",
+            "example": 6
+          },
+          "cached": {
+            "type": "boolean",
+            "description": "Whether the data was retrieved from cache",
+            "example": false
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the data was fetched",
+            "example": "2024-01-15T10:30:00Z"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["success", "errors"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["code", "message"],
+              "properties": {
+                "code": {
+                  "type": "integer",
+                  "description": "Error code"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Error message"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

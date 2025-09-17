@@ -1,72 +1,138 @@
-# OpenAPI Template
+# Token Metadata API
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/chanfana-openapi-template)
+A Cloudflare Workers API for fetching token metadata from Ethereum networks. Built with Hono, Chanfana, and ethers.js.
 
-![OpenAPI Template Preview](https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/91076b39-1f5b-46f6-7f14-536a6f183000/public)
+## Features
 
-<!-- dash-content-start -->
+- Query token metadata by network and address
+- Support for multiple Ethereum networks (mainnet, arbitrum, polygon, etc.)
+- In-memory caching for improved performance
+- OpenAPI/Swagger documentation
+- TypeScript support
 
-This is a Cloudflare Worker with OpenAPI 3.1 Auto Generation and Validation using [chanfana](https://github.com/cloudflare/chanfana) and [Hono](https://github.com/honojs/hono).
+## Supported Networks
 
-This is an example project made to be used as a quick start into building OpenAPI compliant Workers that generates the
-`openapi.json` schema automatically from code and validates the incoming request to the defined parameters or request body.
+- Mainnet
+- Arbitrum
+- Polygon
+- Optimism
+- Base
+- Sepolia (testnet)
+- Arbitrum Sepolia (testnet)
+- Polygon Mumbai (testnet)
 
-This template includes various endpoints, a D1 database, and integration tests using [Vitest](https://vitest.dev/) as examples. In endpoints, you will find [chanfana D1 AutoEndpoints](https://chanfana.com/endpoints/auto/d1) and a [normal endpoint](https://chanfana.com/endpoints/defining-endpoints) to serve as examples for your projects.
+## API Endpoints
 
-Besides being able to see the OpenAPI schema (openapi.json) in the browser, you can also extract the schema locally no hassle by running this command `npm run schema`.
+### GET /tokens/{network}/{address}
 
-<!-- dash-content-end -->
+Retrieve token metadata for a given token address on a specific Ethereum network.
 
-> [!IMPORTANT]
-> When using C3 to create this project, select "no" when it asks if you want to deploy. You need to follow this project's [setup steps](https://github.com/cloudflare/templates/tree/main/openapi-template#setup-steps) before deploying.
+**Parameters:**
+- `network` (string): Ethereum network name (e.g., "arbitrum", "mainnet")
+- `address` (string): Token contract address (e.g., "0xaf88d065e77c8cc2239327c5edb3a432268e5831")
 
-## Getting Started
-
-Outside of this repo, you can start a new project with this template using [C3](https://developers.cloudflare.com/pages/get-started/c3/) (the `create-cloudflare` CLI):
-
-```bash
-npm create cloudflare@latest -- --template=cloudflare/templates/openapi-template
+**Response:**
+```json
+{
+  "address": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+  "network": "arbitrum",
+  "name": "USD Coin",
+  "symbol": "USDC",
+  "decimals": 6,
+  "cached": false,
+  "timestamp": "2024-01-15T10:30:00Z"
+}
 ```
 
-A live public deployment of this template is available at [https://openapi-template.templates.workers.dev](https://openapi-template.templates.workers.dev)
+**Example:**
+```bash
+curl https://your-api-domain.com/tokens/arbitrum/0xaf88d065e77c8cc2239327c5edb3a432268e5831
+```
+
+## Development
+
+### Prerequisites
+
+- Node.js 18+
+- npm or pnpm
+- Cloudflare account (for deployment)
+
+### Installation
+
+```bash
+npm install
+```
+
+### Local Development
+
+```bash
+npm run dev
+```
+
+### Testing
+
+```bash
+npm test
+```
+
+### Deployment
+
+```bash
+npm run deploy
+```
+
+## Configuration
+
+The API uses public RPC endpoints by default. For production use, consider configuring your own RPC endpoints in `src/services/ethereum.ts`.
+
+## Caching
+
+Token metadata is cached in memory for 24 hours to improve performance and reduce RPC calls.
+
+## Error Handling
+
+The API returns appropriate HTTP status codes and error messages for:
+- Invalid network names (400)
+- Invalid address formats (400)
+- Token not found (404)
+- Internal server errors (500)
+
+## Project Structure
+
+1. Your main router is defined in `src/index.ts`.
+2. Token endpoints are in `src/endpoints/tokens/`.
+3. Ethereum service is in `src/services/ethereum.ts`.
+4. Caching service is in `src/services/cache.ts`.
+5. Integration tests are located in the `tests/` directory.
+
+## OpenAPI Documentation
+
+The API automatically generates OpenAPI 3.0 documentation. You can view it at the root endpoint (`/`) when running the application.
 
 ## Setup Steps
 
-1. Install the project dependencies with a package manager of your choice:
+1. Install the project dependencies:
    ```bash
    npm install
    ```
-2. Create a [D1 database](https://developers.cloudflare.com/d1/get-started/) with the name "openapi-template-db":
+
+2. Create a D1 database (if using the tasks endpoints):
    ```bash
-   npx wrangler d1 create openapi-template-db
+   npx wrangler d1 create tokens-metadata-api-db
    ```
    ...and update the `database_id` field in `wrangler.json` with the new database ID.
-3. Run the following db migration to initialize the database (notice the `migrations` directory in this project):
+
+3. Run database migrations (if using the tasks endpoints):
    ```bash
    npx wrangler d1 migrations apply DB --remote
    ```
-4. Deploy the project!
+
+4. Deploy the project:
    ```bash
-   npx wrangler deploy
+   npm run deploy
    ```
-5. Monitor your worker
+
+5. Monitor your worker:
    ```bash
    npx wrangler tail
    ```
-
-## Testing
-
-This template includes integration tests using [Vitest](https://vitest.dev/). To run the tests locally:
-
-```bash
-npm run test
-```
-
-Test files are located in the `tests/` directory, with examples demonstrating how to test your endpoints and database interactions.
-
-## Project structure
-
-1. Your main router is defined in `src/index.ts`.
-2. Each endpoint has its own file in `src/endpoints/`.
-3. Integration tests are located in the `tests/` directory.
-4. For more information read the [chanfana documentation](https://chanfana.com/), [Hono documentation](https://hono.dev/docs), and [Vitest documentation](https://vitest.dev/guide/).
