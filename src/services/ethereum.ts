@@ -133,7 +133,7 @@ export class EthereumService {
     return /^0x[a-fA-F0-9]{40}$/.test(address);
   }
 
-  async getTokenMetadata(network: string, address: string): Promise<TokenMetadata> {
+  async getTokenMetadataByAddress(network: string, address: string): Promise<TokenMetadata> {
     console.log(`[EthereumService] Getting token metadata for ${network}, ${address}`);
 
     // Validate network
@@ -182,6 +182,19 @@ export class EthereumService {
     } catch (error) {
       throw new Error(`Failed to fetch token metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  async getTokenMetadataBySymbol(network: string, symbol: string): Promise<TokenMetadata> {
+    console.log(`[EthereumService] Getting token metadata for ${network}, ${symbol}`);
+
+    // Validate network
+    if (!NETWORKS[network]) {
+      throw new Error(`Unsupported network: ${network}`);
+    }
+
+    console.log(`[EthereumService] Network: ${network}`);
+
+    
   }
 
   getSupportedNetworks(): string[] {

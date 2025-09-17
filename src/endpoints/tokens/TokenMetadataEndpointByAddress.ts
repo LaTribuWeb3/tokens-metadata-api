@@ -23,7 +23,7 @@ const TokenMetadataParamsSchema = z.object({
   address: AddressSchema
 });
 
-export const TokenMetadataEndpoint = async (c: any) => {
+export const TokenMetadataEndpointByAddress = async (c: any) => {
   try {
     // Parse and validate parameters
     const { network, address } = TokenMetadataParamsSchema.parse(c.req.param());
@@ -33,24 +33,24 @@ export const TokenMetadataEndpoint = async (c: any) => {
       throw new ApiException(`Unsupported network: ${network}. Supported networks: ${ethereumService.getSupportedNetworks().join(', ')}`);
     }
 
-    console.log(`[TokenMetadataEndpoint] Network: ${network}, Address: ${address}`);
+    console.log(`[TokenMetadataEndpointByAddress] Network: ${network}, Address: ${address}`);
 
     // Check cache first
-    const cachedData = cacheService.get(network, address);
+    const cachedData = cacheService.getByAddress(network, address);
     if (cachedData) {
-      console.log(`[TokenMetadataEndpoint] Cache hit for ${network}, ${address}`);
+      console.log(`[TokenMetadataEndpointByAddress] Cache hit for ${network}, ${address}`);
       return c.json(cachedData);
     }
 
-    console.log(`[TokenMetadataEndpoint] Cache miss for ${network}, ${address}`);
+    console.log(`[TokenMetadataEndpointByAddress] Cache miss for ${network}, ${address}`);
 
     // Fetch from Ethereum if not cached
-    const tokenMetadata = await ethereumService.getTokenMetadata(network, address);
+    const tokenMetadata = await ethereumService.getTokenMetadataByAddress(network, address);
 
-    console.log(`[TokenMetadataEndpoint] Fetched token metadata for ${network}, ${address}`);
+    console.log(`[TokenMetadataEndpointByAddress] Fetched token metadata for ${network}, ${address}`);
 
     // Cache the result
-    cacheService.set(network, address, tokenMetadata);
+    cacheService.setByAddress(network, address, tokenMetadata);
 
     return c.json(tokenMetadata);
 
