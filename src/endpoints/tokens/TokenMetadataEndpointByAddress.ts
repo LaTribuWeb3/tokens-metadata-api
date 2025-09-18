@@ -50,7 +50,7 @@ export const TokenMetadataEndpointByAddress = async (c: any) => {
     console.log(`[TokenMetadataEndpointByAddress] Fetched token metadata for ${network}, ${address}`);
 
     // Cache the result
-    cacheService.setByAddress(network, address, tokenMetadata);
+    await cacheService.setByAddress(network, address, tokenMetadata);
 
     return c.json(tokenMetadata);
 
