@@ -216,6 +216,7 @@ export class EthereumService {
 
       return {
         address: address.toLowerCase(),
+        network,
         name: name as string,
         symbol: symbol as string,
         decimals: decimals as number,
