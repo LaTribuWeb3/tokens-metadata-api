@@ -14,11 +14,6 @@ export interface NetworkConfig {
   chainId: number;
 }
 
-export interface CacheEntry {
-  data: TokenMetadata;
-  timestamp: number;
-  ttl: number;
-}
 
 export interface ErrorResponse {
   success: false;
