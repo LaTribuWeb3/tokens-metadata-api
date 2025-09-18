@@ -38,18 +38,8 @@ router.get('/:network/:address', verifyToken, async (req: AuthenticatedRequest, 
       return res.status(400).json(errorResponse);
     }
 
-    // Validate network
-    const supportedNetworks = ['mainnet', 'arbitrum', 'polygon', 'optimism', 'base', 'sepolia', 'arbitrum-sepolia', 'polygon-mumbai'];
-    if (!supportedNetworks.includes(network)) {
-      const errorResponse: ErrorResponse = {
-        success: false,
-        errors: [{
-          code: 400,
-          message: `Unsupported network: ${network}. Supported networks: ${supportedNetworks.join(', ')}`
-        }]
-      };
-      return res.status(400).json(errorResponse);
-    }
+    // Validate network - this will be checked in the controller as well
+    // We'll let the controller handle the detailed validation with dynamic network list
 
     const result = await getTokenMetadata(network, address);
     res.json(result);

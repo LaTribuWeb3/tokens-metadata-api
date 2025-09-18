@@ -15,8 +15,8 @@ export async function getTokenMetadata(network: string, address: string): Promis
   console.log(`[getTokenMetadata] Cache miss for ${network}, ${address}`);
 
   // Check if network is supported
-  if (!ethereumService.isNetworkSupported(network)) {
-    const supportedNetworks = ethereumService.getSupportedNetworks().join(', ');
+  if (!(await ethereumService.isNetworkSupported(network))) {
+    const supportedNetworks = (await ethereumService.getSupportedNetworks()).join(', ');
     throw new Error(`Unsupported network: ${network}. Supported networks: ${supportedNetworks}`);
   }
 

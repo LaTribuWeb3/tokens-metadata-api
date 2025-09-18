@@ -14,6 +14,18 @@ export interface NetworkConfig {
   name: string;
   rpcUrl: string;
   chainId: number;
+  chainSlug: string;
+}
+
+export interface ChainListRPC {
+  chainSlug: string;
+  chainId: number;
+  name: string;
+  rpc: Array<{
+    url: string;
+    tracking?: string;
+    isOpenSource?: boolean;
+  }>;
 }
 
 

@@ -1,143 +1,192 @@
-import { TokenMetadata, NetworkConfig } from '../types';
+import { TokenMetadata, NetworkConfig, ChainListRPC } from '../types';
+import { createPublicClient, http, parseAbi } from 'viem';
 
-// ERC-20 function selectors for token metadata
-const ERC20_SELECTORS = {
-  name: '0x06fdde03', // name()
-  symbol: '0x95d89b41', // symbol()
-  decimals: '0x313ce567' // decimals()
-};
+// ERC-20 ABI for token metadata functions
+const ERC20_ABI = parseAbi([
+  'function name() view returns (string)',
+  'function symbol() view returns (string)',
+  'function decimals() view returns (uint8)'
+]);
 
-// Network configurations
-const NETWORKS: Record<string, NetworkConfig> = {
-  mainnet: {
-    name: 'mainnet',
-    rpcUrl: 'https://eth.llamarpc.com',
-    chainId: 1
-  },
-  arbitrum: {
-    name: 'arbitrum',
-    rpcUrl: 'https://api.zan.top/arb-one',
-    chainId: 42161
-  },
-  polygon: {
-    name: 'polygon',
-    rpcUrl: 'https://polygon-mainnet.g.alchemy.com/v2/demo',
-    chainId: 137
-  },
-  optimism: {
-    name: 'optimism',
-    rpcUrl: 'https://opt-mainnet.g.alchemy.com/v2/demo',
-    chainId: 10
-  },
-  base: {
-    name: 'base',
-    rpcUrl: 'https://base-mainnet.g.alchemy.com/v2/demo',
-    chainId: 8453
-  },
-  sepolia: {
-    name: 'sepolia',
-    rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/demo',
-    chainId: 11155111
-  },
-  'arbitrum-sepolia': {
-    name: 'arbitrum-sepolia',
-    rpcUrl: 'https://arb-sepolia.g.alchemy.com/v2/demo',
-    chainId: 421614
-  },
-  'polygon-mumbai': {
-    name: 'polygon-mumbai',
-    rpcUrl: 'https://polygon-mumbai.g.alchemy.com/v2/demo',
-    chainId: 80001
-  }
-};
+// Cache for RPC list and network configs
+let rpcListCache: ChainListRPC[] | null = null;
+let networkConfigsCache: Record<string, NetworkConfig> | null = null;
+let lastFetchTime = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export class EthereumService {
-  private async makeRpcCall(rpcUrl: string, method: string, params: any[]): Promise<any> {
-    const response = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method,
-        params,
-        id: 1,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`RPC call failed: ${response.status} ${response.statusText}`);
+  private async fetchRPCList(): Promise<ChainListRPC[]> {
+    try {
+      console.log('[EthereumService] Fetching RPC list from chainlist.org');
+      const response = await fetch('https://chainlist.org/rpcs.json');
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch RPC list: ${response.status} ${response.statusText}`);
+      }
+      
+      const rpcList = await response.json() as ChainListRPC[];
+      console.log(`[EthereumService] Fetched ${rpcList.length} RPC configurations`);
+      return rpcList;
+    } catch (error) {
+      console.error('[EthereumService] Error fetching RPC list:', error);
+      throw new Error(`Failed to fetch RPC list: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    const data = await response.json() as any;
-    
-    if (data.error) {
-      throw new Error(`RPC error: ${data.error.message}`);
-    }
-
-    return data.result;
   }
 
-  private async callContract(network: string, address: string, data: string): Promise<string> {
-    const networkConfig = NETWORKS[network];
+  private async getNetworkConfigs(): Promise<Record<string, NetworkConfig>> {
+    const now = Date.now();
+    
+    // Return cached configs if they exist and are not expired
+    if (networkConfigsCache && (now - lastFetchTime) < CACHE_DURATION) {
+      console.log('[EthereumService] Using cached network configs');
+      return networkConfigsCache;
+    }
+
+    try {
+      // Fetch fresh RPC list
+      const rpcList = await this.fetchRPCList();
+      rpcListCache = rpcList;
+      
+      // Build network configs for all available networks
+      const configs: Record<string, NetworkConfig> = {};
+      
+      for (const chain of rpcList) {
+        if (chain.chainSlug && chain.rpc && chain.rpc.length > 0) {
+          const firstRpc = chain.rpc[0];
+          
+          // Extract URL from RPC object (chainlist.org returns objects with url property)
+          const rpcUrl = typeof firstRpc === 'string' ? firstRpc : firstRpc?.url;
+          
+          // Ensure rpcUrl is a string
+          if (typeof rpcUrl === 'string' && rpcUrl.startsWith('http')) {
+            configs[chain.chainSlug] = {
+              name: chain.name,
+              rpcUrl: rpcUrl,
+              chainId: chain.chainId,
+              chainSlug: chain.chainSlug
+            };
+            console.log(`[EthereumService] Configured ${chain.chainSlug}: ${rpcUrl}`);
+          } else {
+            console.warn(`[EthereumService] Invalid RPC URL for ${chain.chainSlug}:`, rpcUrl);
+          }
+        } else {
+          console.warn(`[EthereumService] Skipping chain ${chain.chainSlug || 'unknown'}: no valid RPC found`);
+        }
+      }
+      
+      // Cache the results
+      networkConfigsCache = configs;
+      lastFetchTime = now;
+      
+      return configs;
+    } catch (error) {
+      console.error('[EthereumService] Error building network configs:', error);
+      
+      // If we have cached configs, use them as fallback
+      if (networkConfigsCache) {
+        console.log('[EthereumService] Using stale cached configs as fallback');
+        return networkConfigsCache;
+      }
+      
+      throw error;
+    }
+  }
+
+  private createViemClient(rpcUrl: string) {
+    // Validate that rpcUrl is a proper string
+    if (typeof rpcUrl !== 'string' || !rpcUrl.startsWith('http')) {
+      throw new Error(`Invalid RPC URL: ${rpcUrl} (type: ${typeof rpcUrl})`);
+    }
+    
+    
+    return createPublicClient({
+      transport: http(rpcUrl),
+    });
+  }
+
+  private async callContract(network: string, address: string, functionName: string): Promise<any> {
+    const networkConfigs = await this.getNetworkConfigs();
+    const networkConfig = networkConfigs[network];
+    
     if (!networkConfig) {
       throw new Error(`Unsupported network: ${network}`);
     }
 
     console.log(`[EthereumService] Calling contract on ${networkConfig.rpcUrl}`);
 
-    const result = await this.makeRpcCall(networkConfig.rpcUrl, 'eth_call', [
-      {
-        to: address,
-        data: data,
-      },
-      'latest',
-    ]);
-
-    return result;
-  }
-
-  private decodeStringResponse(hexData: string): string {
-    // Remove 0x prefix and decode the hex string
-    const hex = hexData.slice(2);
-    
-    // For string return types, the first 32 bytes contain the offset to the actual string data
-    const offset = parseInt(hex.slice(0, 64), 16) * 2;
-    
-    // The next 32 bytes contain the length of the string
-    const length = parseInt(hex.slice(offset, offset + 64), 16) * 2;
-    
-    // Extract the actual string data
-    const stringHex = hex.slice(offset + 64, offset + 64 + length);
-    
-    // Convert hex to string
-    let result = '';
-    for (let i = 0; i < stringHex.length; i += 2) {
-      const byte = parseInt(stringHex.substr(i, 2), 16);
-      if (byte !== 0) {
-        result += String.fromCharCode(byte);
+    try {
+      const client = this.createViemClient(networkConfig.rpcUrl);
+      
+      // First, check if the address is actually a contract
+      const code = await client.getCode({ address: address as `0x${string}` });
+      if (!code || code === '0x') {
+        throw new Error(`Address ${address} is not a contract on ${network} network`);
       }
+      
+      const result = await client.readContract({
+        address: address as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: functionName as 'name' | 'symbol' | 'decimals',
+      });
+
+      return result;
+    } catch (error) {
+      console.error(`[EthereumService] Error calling contract function ${functionName}:`, error);
+      console.error(`[EthereumService] Network: ${network}, Address: ${address}, RPC: ${networkConfig.rpcUrl}`);
+      
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('returned no data')) {
+          throw new Error(`Contract at ${address} on ${network} network does not have the ${functionName}() function or is not an ERC-20 token. This address may not be deployed on this network or may be a different type of contract.`);
+        }
+        if (error.message.includes('is not a contract')) {
+          throw new Error(`Address ${address} is not a contract on ${network} network. Please verify the contract address is correct for this network.`);
+        }
+      }
+      
+      throw new Error(`Contract call failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-    return result;
   }
 
-  private decodeUint8Response(hexData: string): number {
-    // Remove 0x prefix and decode the uint8
-    const hex = hexData.slice(2);
-    // For uint8, the value is in the last 2 characters (right-padded to 32 bytes)
-    return parseInt(hex.slice(hex.length - 2), 16);
-  }
 
   private isValidAddress(address: string): boolean {
     return /^0x[a-fA-F0-9]{40}$/.test(address);
   }
 
+  private warnAboutKnownTokenAddresses(network: string, address: string): void {
+    const knownTokens: Record<string, Record<string, string>> = {
+      'ethereum': {
+        '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48': 'USDC (Ethereum Mainnet)',
+        '0xdac17f958d2ee523a2206206994597c13d831ec7': 'USDT (Ethereum Mainnet)',
+        '0x6b175474e89094c44da98b954eedeac495271d0f': 'DAI (Ethereum Mainnet)'
+      },
+      'arbitrum-one': {
+        '0xaf88d065e77c8cc2239327c5edb3a432268e5831': 'USDC (Arbitrum One)',
+        '0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9': 'USDT (Arbitrum One)'
+      },
+      'polygon-pos': {
+        '0x2791bca1f2de4661ed88a30c99a7a9449aa84174': 'USDC (Polygon)',
+        '0xc2132d05d31c914a87c6611c10748aeb04b58e8f': 'USDT (Polygon)'
+      }
+    };
+
+    const lowerAddress = address.toLowerCase();
+    
+    // Check if this is a known token address for a different network
+    for (const [net, tokens] of Object.entries(knownTokens)) {
+      if (net !== network && tokens[lowerAddress]) {
+        console.warn(`[EthereumService] Warning: ${tokens[lowerAddress]} is known on ${net} network, but you're querying ${network} network. This may cause errors if the token is not deployed on ${network}.`);
+        break;
+      }
+    }
+  }
+
   async getTokenMetadataByAddress(network: string, address: string): Promise<TokenMetadata> {
     console.log(`[EthereumService] Getting token metadata for ${network}, ${address}`);
 
-    // Validate network
-    if (!NETWORKS[network]) {
+    // Get network configs and validate network
+    const networkConfigs = await this.getNetworkConfigs();
+    if (!networkConfigs[network]) {
       throw new Error(`Unsupported network: ${network}`);
     }
 
@@ -149,22 +198,17 @@ export class EthereumService {
     }
 
     console.log(`[EthereumService] Address: ${address}`);
+    
+    // Check if this is a known token address that might not exist on this network
+    this.warnAboutKnownTokenAddresses(network, address);
 
     try {
-      // Fetch token metadata in parallel
-      const [nameResult, symbolResult, decimalsResult] = await Promise.all([
-        this.callContract(network, address, ERC20_SELECTORS.name),
-        this.callContract(network, address, ERC20_SELECTORS.symbol),
-        this.callContract(network, address, ERC20_SELECTORS.decimals)
+      // Fetch token metadata in parallel using Viem
+      const [name, symbol, decimals] = await Promise.all([
+        this.callContract(network, address, 'name'),
+        this.callContract(network, address, 'symbol'),
+        this.callContract(network, address, 'decimals')
       ]);
-
-      console.log(`[EthereumService] Name: ${nameResult}`);
-      console.log(`[EthereumService] Symbol: ${symbolResult}`);
-      console.log(`[EthereumService] Decimals: ${decimalsResult}`);
-
-      const name = this.decodeStringResponse(nameResult);
-      const symbol = this.decodeStringResponse(symbolResult);
-      const decimals = this.decodeUint8Response(decimalsResult);
 
       console.log(`[EthereumService] Name: ${name}`);
       console.log(`[EthereumService] Symbol: ${symbol}`);
@@ -173,9 +217,9 @@ export class EthereumService {
       return {
         address: address.toLowerCase(),
         network,
-        name,
-        symbol,
-        decimals,
+        name: name as string,
+        symbol: symbol as string,
+        decimals: decimals as number,
         cached: false,
         timestamp: new Date().toISOString()
       };
@@ -184,12 +228,14 @@ export class EthereumService {
     }
   }
 
-  getSupportedNetworks(): string[] {
-    return Object.keys(NETWORKS);
+  async getSupportedNetworks(): Promise<string[]> {
+    const networkConfigs = await this.getNetworkConfigs();
+    return Object.keys(networkConfigs);
   }
 
-  isNetworkSupported(network: string): boolean {
-    return network in NETWORKS;
+  async isNetworkSupported(network: string): Promise<boolean> {
+    const networkConfigs = await this.getNetworkConfigs();
+    return network in networkConfigs;
   }
 }
 

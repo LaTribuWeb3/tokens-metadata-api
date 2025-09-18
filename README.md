@@ -105,11 +105,28 @@ The API uses public RPC endpoints by default. For production use, consider confi
 
 Token metadata is cached to a local file (`cache.json`) for 24 hours to improve performance and reduce RPC calls.
 
+## Important Notes About Contract Addresses
+
+**Contract addresses are different across networks!** The same token (e.g., USDC) will have different contract addresses on different networks:
+
+- **Ethereum Mainnet**: `0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48` (USDC)
+- **Arbitrum One**: `0xaf88d065e77c8cc2239327c5edb3a432268e5831` (USDC)
+- **Polygon**: `0x2791bca1f2de4661ed88a30c99a7a9449aa84174` (USDC)
+
+If you try to query a contract address from one network on a different network, you'll get an error because:
+1. The contract may not be deployed at that address on the target network
+2. A different contract (or no contract) may exist at that address
+3. The contract may not implement the ERC-20 standard
+
+**Always verify the correct contract address for the specific network you're querying.**
+
 ## Error Handling
 
 The API returns appropriate HTTP status codes and error messages for:
 - Invalid network names (400)
 - Invalid address formats (400)
+- Contract not found or not deployed on the specified network (500)
+- Contract does not implement ERC-20 standard (500)
 - Token not found (404)
 - Internal server errors (500)
 
