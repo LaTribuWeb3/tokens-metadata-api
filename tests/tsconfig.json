@@ -1,8 +1,11 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "moduleResolution": "bundler",
-    "types": ["@cloudflare/vitest-pool-workers"]
+    "moduleResolution": "node",
+    "types": ["node", "vitest/globals"],
+    "outDir": null,
+    "rootDir": "."
   },
-  "include": ["./**/*.ts", "./**/*.mts"]
+  "include": ["./**/*.ts", "./**/*.mts"],
+  "exclude": ["../node_modules", "../dist"]
 }

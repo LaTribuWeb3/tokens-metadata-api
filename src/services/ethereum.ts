@@ -16,7 +16,7 @@ const NETWORKS: Record<string, NetworkConfig> = {
   },
   arbitrum: {
     name: 'arbitrum',
-    rpcUrl: 'https://arb-mainnet.g.alchemy.com/v2/demo',
+    rpcUrl: 'https://api.zan.top/arb-one',
     chainId: 42161
   },
   polygon: {
