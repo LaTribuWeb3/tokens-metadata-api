@@ -1,13 +1,17 @@
 import express, { Request, Response } from 'express';
 import { getTokenMetadata } from '../controllers/tokens';
-import { ErrorResponse } from '../types';
+import { ErrorResponse, AuthenticatedRequest } from '../types';
+import { verifyToken } from '../middleware/auth';
 
 const router = express.Router();
 
-// GET /tokens/{network}/{address} - Get token metadata
-router.get('/:network/:address', async (req: Request, res: Response) => {
+// GET /tokens/{network}/{address} - Get token metadata (requires authentication)
+router.get('/:network/:address', verifyToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { network, address } = req.params;
+    
+    // User information is available in req.user after JWT verification
+    console.log(`[Token Request] User: ${req.user?.userId}, Network: ${network}, Address: ${address}`);
     
     // Basic validation
     if (!network || !address) {

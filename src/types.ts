@@ -1,3 +1,5 @@
+import { Request } from 'express';
+
 export interface TokenMetadata {
   address: string;
   network: string;
@@ -27,3 +29,15 @@ export type ApiResponse<T = any> = {
   success: true;
   data?: T;
 } | ErrorResponse;
+
+export interface JWTPayload {
+  userId: string;
+  email?: string;
+  role?: string;
+  iat?: number;
+  exp?: number;
+}
+
+export interface AuthenticatedRequest extends Request {
+  user?: JWTPayload;
+}
