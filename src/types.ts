@@ -1,8 +1,3 @@
-import type { Context } from "hono";
-
-export type AppContext = Context<{ Bindings: Env }>;
-export type HandleArgs = [AppContext];
-
 export interface TokenMetadata {
   address: string;
   network: string;
@@ -24,3 +19,16 @@ export interface CacheEntry {
   timestamp: number;
   ttl: number;
 }
+
+export interface ErrorResponse {
+  success: false;
+  errors: Array<{
+    code: number;
+    message: string;
+  }>;
+}
+
+export type ApiResponse<T = any> = {
+  success: true;
+  data?: T;
+} | ErrorResponse;

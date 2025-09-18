@@ -1,50 +1,71 @@
-import { ApiException, fromHono } from "chanfana";
-import { Hono } from "hono";
-import { tokensRouter } from "./endpoints/tokens/router";
-import { ContentfulStatusCode } from "hono/utils/http-status";
-import { DummyEndpoint } from "./endpoints/dummyEndpoint";
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import { tokensRouter } from './routes/tokens';
+import { ErrorResponse } from './types';
 
-// Start a Hono app
-const app = new Hono<{ Bindings: Env }>();
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-app.onError((err, c) => {
-  if (err instanceof ApiException) {
-    // If it's a Chanfana ApiException, let Chanfana handle the response
-    return c.json(
-      { success: false, errors: err.buildResponse() },
-      err.status as ContentfulStatusCode,
-    );
-  }
+// Middleware
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
 
-  console.error("Global error handler caught:", err); // Log the error if it's not known
-
-  // For other errors, return a generic 500 response
-  return c.json(
-    {
-      success: false,
-      errors: [{ code: 7000, message: "Internal Server Error" }],
-    },
-    500,
-  );
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Setup OpenAPI registry
-const openapi = fromHono(app, {
-  docs_url: "/",
-  schema: {
-    info: {
-      title: "Token Metadata API",
-      version: "1.0.0",
-      description: "API for fetching token metadata from Ethereum networks",
-    },
-  },
+// API documentation endpoint (serving the swagger.json)
+app.get('/', (req, res) => {
+  res.json({
+    title: "Token Metadata API",
+    version: "1.0.0",
+    description: "API for fetching token metadata from Ethereum networks",
+    endpoints: {
+      "GET /tokens/{network}/{address}": "Get token metadata by address",
+      "GET /health": "Health check endpoint"
+    }
+  });
 });
 
-// Register Tokens Sub router
-openapi.route("/tokens", tokensRouter);
+// Routes
+app.use('/tokens', tokensRouter);
 
-// Register other endpoints
-openapi.post("/dummy/:slug", DummyEndpoint);
+// Global error handler
+app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
+  console.error('Global error handler caught:', err);
+  
+  const errorResponse: ErrorResponse = {
+    success: false,
+    errors: [{
+      code: err.status || 500,
+      message: err.message || 'Internal Server Error'
+    }]
+  };
+  
+  res.status(err.status || 500).json(errorResponse);
+});
 
-// Export the Hono app
+// 404 handler
+app.use('*', (req: Request, res: Response) => {
+  const errorResponse: ErrorResponse = {
+    success: false,
+    errors: [{
+      code: 404,
+      message: `Route ${req.method} ${req.originalUrl} not found`
+    }]
+  };
+  
+  res.status(404).json(errorResponse);
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Token Metadata API server running on port ${PORT}`);
+  console.log(`Health check: http://localhost:${PORT}/health`);
+  console.log(`API documentation: http://localhost:${PORT}/`);
+});
+
 export default app;

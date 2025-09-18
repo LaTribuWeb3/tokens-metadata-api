@@ -1,5 +1,6 @@
 import { TokenMetadata, CacheEntry } from '../types';
 import fs from 'fs/promises';
+import path from 'path';
 
 export class CacheService {
   private cache: Map<string, CacheEntry> = new Map();
@@ -7,23 +8,16 @@ export class CacheService {
   private readonly CACHE_FILE_PATH: string;
 
   constructor(cacheFilePath?: string) {
-    this.CACHE_FILE_PATH = cacheFilePath || './cache.json';
+    this.CACHE_FILE_PATH = cacheFilePath || path.join(process.cwd(), 'cache.json');
     this.loadCache();
   }
 
   private async loadCache(): Promise<void> {
     try {
-      // Check if we're in a Node.js environment
-      if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-        const cacheData = await fs.readFile(this.CACHE_FILE_PATH, 'utf-8');
-        const cacheObject = JSON.parse(cacheData);
-        this.cache = new Map(Object.entries(cacheObject));
-        console.log(`Loaded ${this.cache.size} entries from cache file`);
-      } else {
-        // In Cloudflare Workers environment, start with empty cache
-        console.log('Running in Cloudflare Workers environment, starting with empty cache');
-        this.cache = new Map();
-      }
+      const cacheData = await fs.readFile(this.CACHE_FILE_PATH, 'utf-8');
+      const cacheObject = JSON.parse(cacheData);
+      this.cache = new Map(Object.entries(cacheObject));
+      console.log(`Loaded ${this.cache.size} entries from cache file`);
     } catch (error) {
       // If file doesn't exist or is invalid, start with empty cache
       console.log('Cache file not found or invalid, starting with empty cache');
@@ -33,10 +27,6 @@ export class CacheService {
 
   private async saveCache(): Promise<void> {
     try {
-      console.log('Saving cache to file');
-      // Check if we're in a Node.js environment
-      console.log('Running in Node.js environment, saving cache to file');
-      
       const cacheObject = Object.fromEntries(this.cache);
       await fs.writeFile(this.CACHE_FILE_PATH, JSON.stringify(cacheObject, null, 2));
       console.log(`Saved ${this.cache.size} entries to cache file`);
