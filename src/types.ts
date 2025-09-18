@@ -2,7 +2,6 @@ import { Request } from 'express';
 
 export interface TokenMetadata {
   address: string;
-  network: string;
   name: string;
   symbol: string;
   decimals: number;
